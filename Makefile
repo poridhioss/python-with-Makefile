@@ -1,5 +1,3 @@
-# Minimal but Effective Makefile for Python Development
-
 # Variables
 PYTHON := python3
 VENV := venv
@@ -8,63 +6,43 @@ PACKAGE_NAME := myapp
 SRC_DIR := src
 TEST_DIR := tests
 
-# Timestamp markers instead of .PHONY
-VENV_MARKER := $(VENV)/.installed
-DEPS_MARKER := $(VENV)/.deps_installed
-DEV_MARKER := $(VENV)/.dev_installed
-TEST_MARKER := .test_timestamp
-
 # Set up virtual environment
-$(VENV_MARKER):
+$(VENV)/bin/pip:
 	@echo "Creating virtual environment..."
 	@$(PYTHON) -m venv $(VENV)
-	@touch $(VENV_MARKER)
 	@echo "Virtual environment created"
 
 # Install dependencies
-$(DEPS_MARKER): requirements.txt $(VENV_MARKER)
+setup: $(VENV)/bin/pip requirements.txt
 	@echo "Installing dependencies..."
 	@$(VENV_BIN)/pip install --upgrade pip
 	@$(VENV_BIN)/pip install -r requirements.txt
 	@$(VENV_BIN)/pip install pytest flake8
-	@touch $(DEPS_MARKER)
 	@echo "Dependencies installed"
 
-# Setup development environment
-setup: $(DEPS_MARKER)
-	@echo "Development setup complete"
+# Install in development mode
+develop: setup setup.py
+	@echo "Installing package in development mode..."
+	@$(VENV_BIN)/pip install -e .
+	@echo "Development installation complete"
 
-# Run tests with timestamp to avoid unnecessary reruns
-$(TEST_MARKER): $(shell find $(SRC_DIR) $(TEST_DIR) -name "*.py" 2>/dev/null || echo "") $(DEV_MARKER)
+# Run tests
+test: develop
 	@echo "Running tests..."
 	@PYTHONPATH=$(SRC_DIR) $(VENV_BIN)/pytest $(TEST_DIR)
-	@touch $(TEST_MARKER)
 	@echo "Tests complete"
 
-# Run tests (public target)
-test: $(DEV_MARKER) $(TEST_MARKER)
-
 # Run linting
-lint: $(DEPS_MARKER)
+lint: setup
 	@echo "Running linter..."
 	@$(VENV_BIN)/flake8 $(SRC_DIR) $(TEST_DIR)
 	@echo "Linting complete"
 
 # Run the application
-run: $(DEPS_MARKER) develop
+run: develop
 	@echo "Running application..."
-	@cd $(shell pwd) && $(VENV_BIN)/python -c "from myapp.main import main; main()"
+	@cd $(shell pwd) && $(VENV_BIN)/python -c "from $(PACKAGE_NAME).main import main; main()"
 	@echo "Application execution complete"
-
-# Install in development mode
-$(DEV_MARKER): $(DEPS_MARKER) setup.py
-	@echo "Installing package in development mode..."
-	@$(VENV_BIN)/pip install -e .
-	@touch $(DEV_MARKER)
-	@echo "Development installation complete"
-
-# Develop target (public)
-develop: $(DEV_MARKER)
 
 # Clean Python bytecode files
 clean-pyc:
@@ -89,7 +67,6 @@ clean-test:
 	@rm -rf .pytest_cache
 	@rm -rf .coverage
 	@rm -rf htmlcov/
-	@rm -f $(TEST_MARKER)
 	@echo "Test artifacts cleaned"
 
 # Clean all
@@ -100,9 +77,6 @@ clean: clean-pyc clean-build clean-test
 clean-all: clean
 	@echo "Removing virtual environment..."
 	@rm -rf $(VENV)
-	@rm -f $(VENV_MARKER)
-	@rm -f $(DEPS_MARKER)
-	@rm -f $(DEV_MARKER)
 	@echo "Project reset complete"
 
 # Help
